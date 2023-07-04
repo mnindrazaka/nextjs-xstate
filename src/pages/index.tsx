@@ -1,11 +1,79 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
-import styles from '@/styles/Home.module.css'
+import Head from "next/head";
+import { Inter } from "next/font/google";
+import styles from "@/styles/Home.module.css";
+import { createMachine } from "xstate";
+import { useMachine } from "@xstate/react";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
+
+type Todo = {
+  id: number;
+  title: string;
+};
+
+type Context = {
+  todos: Todo[];
+  errorMessage: string;
+};
+
+const fetchMachine = createMachine<Context>({
+  context: {
+    todos: [],
+    errorMessage: "",
+  },
+  /** @xstate-layout N4IgpgJg5mDOIC5QAoC2BDAxgCwJYDswBKAOlwgBswBiAMzABccBtABgF1FQAHAe1lwNcvfFxAAPRAEYAzADYSAVimK5AFgAcc1ho0B2PWoA0IAJ7SNAJiWtbrAJxq5e+xsW6Avh5NoseQqQUvOgQBFB0jDgA+rAArpiYcLBsnEggfAJCImKSCGpqMiQaMor2ZbqaJfIm5ghSehokeop2DYYqzZZePhg4BMQkQSFhEUzYUWCo3AymKWIZgsKiabn5hcWl5RqVitVm0pasJJYtrPUa9azqMvbdIL59AYPBofjh9GMTAE5fvF9zaQWWWWoFysgUylUmm0ugMxn2CAuNlslnsVRc9ncdwe-gGYB+f2oXzAHxYHHm-EW2RW0nkShU6i0On0hhqtOsdjOjikOnslj0XTu+F4EDgYhx-SIFMySxyiAAtHI2QhFdjerjSOQqNKqSCJIhNCQzlD5KxDsb7MqpMUjXZ+TJtqxFAZBT0-JLnsM3jrgXKEPz7E09DI1M1FKGpNolQipLHkbZ7HJnZi1JYNGr3U84gkkj7ZTSEHI40WBYZLHITs6rS5jqdWG01B1FIoM488VMZnnqaDEEWpCQS-zUxXm3orYcmqdzpdrrdvPd1R78b8vl29atLMr9EpivIeajXPU9F4vEA */
+  states: {
+    idle: {
+      on: {
+        fetch: {
+          target: "loading",
+        },
+      },
+      invoke: {
+        src: (context, event) => (callback) => {
+          callback("fetch");
+        },
+      },
+    },
+    loading: {
+      on: {
+        fetch_success: "success",
+        fetch_empty: "empty",
+        fetch_error: "error",
+      },
+      invoke: {
+        src: (context, event) => (callback) => {
+          fetch("https://jsonplaceholder.typicode.com/todos")
+            .then((response) => response.json())
+            .then((json) => {
+              context.todos = json;
+              context.errorMessage = "";
+
+              if (json.length === 0) callback("fetch_empty");
+              else callback("fetch_success");
+            })
+            .catch((err) => {
+              context.todos = [];
+              context.errorMessage = err.message;
+              callback("fetch_error");
+            });
+        },
+      },
+    },
+    success: {},
+    empty: {},
+    error: {
+      on: {
+        refetch: "loading",
+      },
+    },
+  },
+  initial: "idle",
+});
 
 export default function Home() {
+  const [state, send] = useMachine(fetchMachine);
+
   return (
     <>
       <Head>
@@ -15,100 +83,23 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <main className={`${styles.main} ${inter.className}`}>
-        <div className={styles.description}>
-          <p>
-            Get started by editing&nbsp;
-            <code className={styles.code}>src/pages/index.tsx</code>
-          </p>
-          <div>
-            <a
-              href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              By{' '}
-              <Image
-                src="/vercel.svg"
-                alt="Vercel Logo"
-                className={styles.vercelLogo}
-                width={100}
-                height={24}
-                priority
-              />
-            </a>
-          </div>
-        </div>
+        <div>
+          {state.matches("idle") ||
+            (state.matches("loading") && <p>Loading...</p>)}
 
-        <div className={styles.center}>
-          <Image
-            className={styles.logo}
-            src="/next.svg"
-            alt="Next.js Logo"
-            width={180}
-            height={37}
-            priority
-          />
-        </div>
+          {state.matches("success") &&
+            state.context.todos.map((todo) => (
+              <p key={todo.id}>{todo.title}</p>
+            ))}
 
-        <div className={styles.grid}>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2>
-              Docs <span>-&gt;</span>
-            </h2>
-            <p>
-              Find in-depth information about Next.js features and&nbsp;API.
-            </p>
-          </a>
-
-          <a
-            href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2>
-              Learn <span>-&gt;</span>
-            </h2>
-            <p>
-              Learn about Next.js in an interactive course with&nbsp;quizzes!
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2>
-              Templates <span>-&gt;</span>
-            </h2>
-            <p>
-              Discover and deploy boilerplate example Next.js&nbsp;projects.
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2>
-              Deploy <span>-&gt;</span>
-            </h2>
-            <p>
-              Instantly deploy your Next.js site to a shareable URL
-              with&nbsp;Vercel.
-            </p>
-          </a>
+          {state.matches("error") && (
+            <div>
+              <p>Error: {state.context.errorMessage}</p>
+              <button onClick={() => send("refetch")}>Retry</button>
+            </div>
+          )}
         </div>
       </main>
     </>
-  )
+  );
 }
